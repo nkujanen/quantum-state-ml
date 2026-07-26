@@ -1,0 +1,42 @@
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+)
+from matplotlib.backends.backend_qtagg import (
+    FigureCanvasQTAgg as FigureCanvas
+)
+
+from matplotlib.figure import Figure
+
+from config import MAX_STEPS
+
+
+class ResultsWidget(QWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.init_ui()
+
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        self.axes = self.figure.add_subplot(111)
+
+        layout.addWidget(self.canvas)
+        self.setLayout(layout)
+
+    def update_histogram(self, counts):
+        self.axes.clear()
+
+        oam_values = range(-MAX_STEPS, MAX_STEPS + 1)
+
+        self.axes.bar(oam_values, counts)
+        self.axes.set_xlabel(r"OAM mode $\ell$")
+        self.axes.set_ylabel("Photon counts")
+        self.axes.set_title("Measured OAM distribution")
+
+        self.canvas.draw()
