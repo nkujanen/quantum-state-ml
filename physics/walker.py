@@ -63,20 +63,11 @@ class Walker:
     def single_photon_probabilities(self):
         if self.system != "single":
             raise ValueError("Single probabilities can only be calculated for a single-photon system")
-        probabilities = []
 
-        identity = qeye(2)
-        
-        for l in range(-MAX_STEPS, MAX_STEPS + 1):
-            oam_projector = (
-                basis(OAM_DIMENSION, l + MAX_STEPS)
-                *
-                basis(OAM_DIMENSION, l + MAX_STEPS).dag()
-            )
+        oam_state = self.state.ptrace([0])
+        oam_array = oam_state.full()
 
-            projector = tensor(oam_projector, identity)
-            probability = (self.state * projector).tr().real
-            probabilities.append(probability)
+        probabilities = np.real(np.diag(oam_array))
 
         return probabilities
 
@@ -84,32 +75,11 @@ class Walker:
         if self.system != "two":
             raise ValueError("Joint probabilities can only be calculated for a two-photon system")
 
-        joint_probabilities = np.zeros((OAM_DIMENSION, OAM_DIMENSION))
+        oam_state = self.state.ptrace([0, 2])
+        oam_array = oam_state.full()
 
-        identity = qeye(2)
-
-        for i, l_a in enumerate(range(-MAX_STEPS, MAX_STEPS + 1)):
-            projector_a = (
-                basis(OAM_DIMENSION, l_a + MAX_STEPS)
-                *
-                basis(OAM_DIMENSION, l_a + MAX_STEPS).dag()
-            )
-
-            for j, l_b in enumerate(range(-MAX_STEPS, MAX_STEPS + 1)):
-                projector_b = (
-                    basis(OAM_DIMENSION, l_b + MAX_STEPS)
-                    *
-                    basis(OAM_DIMENSION, l_b + MAX_STEPS).dag()
-                )
-
-                projector = tensor(
-                    projector_a,
-                    identity,
-                    projector_b,
-                    identity
-                )
-
-                joint_probabilities[i, j] = (self.state * projector).tr().real
+        joint_probabilities = np.real(np.diag(oam_array))
+        joint_probabilities = joint_probabilities.reshape(OAM_DIMENSION, OAM_DIMENSION)
 
         return joint_probabilities
 
