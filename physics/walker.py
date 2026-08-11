@@ -51,24 +51,22 @@ class Walker:
 
         transform = tensor(qeye(OAM_DIMENSION), hv_to_lr)
 
-        single_qplate_hv = transform.dag() * qplate_lr * transform
+        single_operator = transform.dag() * qplate_lr * transform
 
         if self.system == "single":
-            qplate_hv = single_qplate_hv
+            full_operator = single_operator
         else:
-            qplate_hv = tensor(single_qplate_hv, single_qplate_hv)
+            full_operator = tensor(single_operator, single_operator)
 
-        self.state = qplate_hv * self.state * qplate_hv.dag()
+        self.state = full_operator * self.state * full_operator.dag()
 
-    def get_probabilities(self):
+    def single_photon_probabilities(self):
+        if self.system != "single":
+            raise ValueError("Single probabilities can only be calculated for a single-photon system")
         probabilities = []
 
-        if self.system == "single":
-            identity = tensor(qeye(2))
-        else:
-            # Everything but OAM modes of the first photon are ignored
-            identity = tensor(qeye(2), qeye(OAM_DIMENSION), qeye(2))
-
+        identity = qeye(2)
+        
         for l in range(-MAX_STEPS, MAX_STEPS + 1):
             oam_projector = (
                 basis(OAM_DIMENSION, l + MAX_STEPS)
@@ -76,29 +74,83 @@ class Walker:
                 basis(OAM_DIMENSION, l + MAX_STEPS).dag()
             )
 
-            # Only get the OAM mode probabilities of the first photon
             projector = tensor(oam_projector, identity)
-        
             probability = (self.state * projector).tr().real
             probabilities.append(probability)
 
         return probabilities
-    
+
+    def two_photon_probabilities(self):
+        if self.system != "two":
+            raise ValueError("Joint probabilities can only be calculated for a two-photon system")
+
+        joint_probabilities = np.zeros((OAM_DIMENSION, OAM_DIMENSION))
+
+        identity = qeye(2)
+
+        for i, l_a in enumerate(range(-MAX_STEPS, MAX_STEPS + 1)):
+            projector_a = (
+                basis(OAM_DIMENSION, l_a + MAX_STEPS)
+                *
+                basis(OAM_DIMENSION, l_a + MAX_STEPS).dag()
+            )
+
+            for j, l_b in enumerate(range(-MAX_STEPS, MAX_STEPS + 1)):
+                projector_b = (
+                    basis(OAM_DIMENSION, l_b + MAX_STEPS)
+                    *
+                    basis(OAM_DIMENSION, l_b + MAX_STEPS).dag()
+                )
+
+                projector = tensor(
+                    projector_a,
+                    identity,
+                    projector_b,
+                    identity
+                )
+
+                joint_probabilities[i, j] = (self.state * projector).tr().real
+
+        return joint_probabilities
+
     def sample_photons(self, number_of_photons):
-        probabilities = self.get_probabilities()
+        if self.system == "single":
+            probabilities = self.single_photon_probabilities()
 
-        samples = np.random.choice(
-            OAM_DIMENSION,
-            size=number_of_photons,
-            p=probabilities
-        )
+            samples = np.random.choice(
+                OAM_DIMENSION,
+                size=number_of_photons,
+                p=probabilities
+            )
 
-        counts = np.bincount(
-            samples,
-            minlength=OAM_DIMENSION
-        )
+            counts = np.bincount(
+                samples,
+                minlength=OAM_DIMENSION
+            )
 
-        return counts
+            return counts
+
+        else:
+            joint_probabilities = self.two_photon_probabilities()
+
+            joint_probabilities = joint_probabilities.flatten()
+            joint_probabilities /= joint_probabilities.sum()
+
+            samples = np.random.choice(
+                OAM_DIMENSION ** 2,
+                size=number_of_photons,
+                p=joint_probabilities
+            )
+
+            coincidence_counts = np.bincount(
+                samples,
+                minlength=OAM_DIMENSION ** 2
+            ).reshape(OAM_DIMENSION, OAM_DIMENSION)
+
+            a_counts = coincidence_counts.sum(axis=1)
+            b_counts = coincidence_counts.sum(axis=0)
+
+            return coincidence_counts, a_counts, b_counts
 
     def get_state(self):
         return self.state
@@ -122,8 +174,8 @@ class Walker:
         single_operator = tensor(qeye(OAM_DIMENSION), single_operator)
 
         if self.system == "single":
-            polarization_operator = single_operator
+            full_operator = single_operator
         else:
-            polarization_operator = tensor(single_operator, single_operator)
+            full_operator = tensor(single_operator, single_operator)
 
-        self.state = polarization_operator * self.state * polarization_operator.dag()
+        self.state = full_operator * self.state * full_operator.dag()

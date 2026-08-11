@@ -64,7 +64,10 @@ class QuantumStateGUI(QWidget):
             walker.qwp(qwp_angle)
             walker.qplate()
 
-        # Calculate and update histogram plot
-        counts = walker.sample_photons(n_photons)
+        measurements = walker.sample_photons(n_photons)
 
-        self.results_widget.update_histogram(counts)
+        if walker.system == "single":
+            self.results_widget.update_histogram(measurements)
+        else:
+            coincidence_counts, a_counts, b_counts = measurements
+            self.results_widget.update_heatmap(coincidence_counts)

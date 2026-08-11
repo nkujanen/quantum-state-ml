@@ -7,6 +7,7 @@ from matplotlib.backends.backend_qtagg import (
 )
 
 from matplotlib.figure import Figure
+from matplotlib.colors import LinearSegmentedColormap
 
 from config import MAX_STEPS
 
@@ -38,5 +39,32 @@ class ResultsWidget(QWidget):
         self.axes.set_xlabel(r"OAM mode $\ell$")
         self.axes.set_ylabel("Photon counts")
         self.axes.set_title("Measured OAM distribution")
+
+        self.canvas.draw()
+
+    def update_heatmap(self, counts):
+        self.axes.clear()
+
+        cmap = LinearSegmentedColormap.from_list(
+            "white_to_blue",
+            ["white", "blue"]
+        )
+        
+        self.axes.imshow(
+            counts,
+            origin="lower",
+            extent=[
+                -MAX_STEPS - 0.5,
+                MAX_STEPS + 0.5,
+                -MAX_STEPS - 0.5,
+                MAX_STEPS + 0.5
+            ],
+            aspect="auto",
+            cmap=cmap
+        )
+
+        self.axes.set_xlabel(r"Photon B OAM mode $\ell_B$")
+        self.axes.set_ylabel(r"Photon A OAM mode $\ell_A$")
+        self.axes.set_title("Measured OAM coincidences")
 
         self.canvas.draw()
