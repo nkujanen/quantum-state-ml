@@ -11,13 +11,24 @@ class Walker:
     def __init__(self, initial_polarization, initial_oam=0):
 
         if abs(initial_oam) > MAX_STEPS:
-            raise ValueError(f"Initial OAM must be less than {MAX_STEPS}")
+            raise ValueError(f"Initial OAM must be between -{MAX_STEPS} and {MAX_STEPS}")
 
-        oam_state = ket2dm(
-            basis(OAM_DIMENSION, initial_oam + MAX_STEPS)
-        )
+        shape = initial_polarization.shape
 
-        self.state = tensor(oam_state, initial_polarization)
+        if shape == (2,2):
+            self.system = "single"
+        elif shape == (4,4):
+            self.system = "two"
+        else:
+            raise ValueError(f"Unsupported polarization dimension {shape}")
+
+        oam_state = ket2dm(basis(OAM_DIMENSION, initial_oam + MAX_STEPS))
+
+        if self.system == "single":
+            self.state = tensor(oam_state, initial_polarization)
+        else:
+            self.state = tensor(oam_state, oam_state, initial_polarization)
+            self.state = self.state.permute([0, 2, 1, 3])
 
     # Public methods
     def hwp(self, angle):
@@ -40,20 +51,33 @@ class Walker:
 
         transform = tensor(qeye(OAM_DIMENSION), hv_to_lr)
 
-        qplate_hv = transform.dag() * qplate_lr * transform
+        single_qplate_hv = transform.dag() * qplate_lr * transform
+
+        if self.system == "single":
+            qplate_hv = single_qplate_hv
+        else:
+            qplate_hv = tensor(single_qplate_hv, single_qplate_hv)
 
         self.state = qplate_hv * self.state * qplate_hv.dag()
 
     def get_probabilities(self):
         probabilities = []
 
+        if self.system == "single":
+            identity = tensor(qeye(2))
+        else:
+            # Everything but OAM modes of the first photon are ignored
+            identity = tensor(qeye(2), qeye(OAM_DIMENSION), qeye(2))
+
         for l in range(-MAX_STEPS, MAX_STEPS + 1):
-            projector = tensor(
+            oam_projector = (
                 basis(OAM_DIMENSION, l + MAX_STEPS)
                 *
-                basis(OAM_DIMENSION, l + MAX_STEPS).dag(),
-                qeye(2)
+                basis(OAM_DIMENSION, l + MAX_STEPS).dag()
             )
+
+            # Only get the OAM mode probabilities of the first photon
+            projector = tensor(oam_projector, identity)
         
             probability = (self.state * projector).tr().real
             probabilities.append(probability)
@@ -93,8 +117,13 @@ class Walker:
             [0, np.exp(-1j * retardance / 2)]
         ])
 
-        polarization_operator = rotation.dag() * phase * rotation
+        single_operator = rotation.dag() * phase * rotation
 
-        operator = tensor(qeye(OAM_DIMENSION), polarization_operator)
+        single_operator = tensor(qeye(OAM_DIMENSION), single_operator)
 
-        self.state = operator * self.state * operator.dag()
+        if self.system == "single":
+            polarization_operator = single_operator
+        else:
+            polarization_operator = tensor(single_operator, single_operator)
+
+        self.state = polarization_operator * self.state * polarization_operator.dag()

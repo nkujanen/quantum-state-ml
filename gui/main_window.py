@@ -51,26 +51,20 @@ class QuantumStateGUI(QWidget):
     def run_simulation(self):
         # Retrieve parameters from input fields
         polarization_state = self.state_widget.get_state()
-
         steps = self.simulation_widget.get_steps()
-
         hwp_angle = self.simulation_widget.get_hwp_angle()
-
         qwp_angle = self.simulation_widget.get_qwp_angle()
+        n_photons = self.simulation_widget.get_photons()
 
         # Initialise walker
         walker = Walker(polarization_state)
 
         for _ in range(steps):
             walker.hwp(hwp_angle)
-
             walker.qwp(qwp_angle)
-
             walker.qplate()
 
         # Calculate and update histogram plot
-        counts = walker.sample_photons(
-            self.simulation_widget.get_photons()
-        )
+        counts = walker.sample_photons(n_photons)
 
         self.results_widget.update_histogram(counts)
