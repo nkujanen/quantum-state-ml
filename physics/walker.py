@@ -46,7 +46,7 @@ class Walker:
         
         hv_to_lr = Qobj([
             [1, 1],
-            [1j, -1j]
+            [-1j, 1j]
         ]) / np.sqrt(2)
 
         transform = tensor(qeye(OAM_DIMENSION), hv_to_lr)
